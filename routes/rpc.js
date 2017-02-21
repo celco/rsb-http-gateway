@@ -5,7 +5,7 @@ var express = require('express');
 var router = express.Router();
 
 /* GET health */
-router.get('/', function(req, res) {
+router.post('/', function(req, res) {
     res.send('OK');
 });
 

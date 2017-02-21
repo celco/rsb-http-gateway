@@ -7,6 +7,7 @@ var nconf = require('nconf');
 var bodyParser = require('body-parser');
 
 var routes = require('./routes');
+var connector = require('./connector');
 
 winston.addColors({
     silly: 'magenta',
@@ -43,19 +44,18 @@ nconf.env()
     });
 
 winston.level = nconf.get('logLevel');
-winston.info('Using RabbitMQ on host %s', nconf.get('rabbitMqHost'))
 
 var app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use('/', routes);
 
-//var rabbitParams = nconf.get('rabbitmq');
-//connector.connect(rabbitParams, function() {
-var server = app.listen(nconf.get('listenPort'), 'localhost', function () {
-    var host = server.address().address;
-    var port = server.address().port;
+var rabbitParams = nconf.get('rabbitmq');
+connector.connect(rabbitParams).then(function () {
+    var server = app.listen(nconf.get('listenPort'), 'localhost', function () {
+        var host = server.address().address;
+        var port = server.address().port;
 
-    winston.info('Accepting connections on http://%s:%s', host, port);
+        winston.info('Accepting connections on http://%s:%s', host, port);
+    });
 });
-//});

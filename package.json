@@ -4,6 +4,7 @@
   "private": true,
   "description": "NodeJS application serving as HTTP proxy for RabbitMQ RPC calls compatible with RSB library.",
   "dependencies": {
+    "amqplib": "^0.5.1",
     "body-parser": "~1.16.0",
     "debug": "~2.6.0",
     "express": "^4.14.1",

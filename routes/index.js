@@ -1,3 +1,5 @@
+'use strict';
+
 var express = require('express');
 var packageJson = require('../package.json');
 var healthRoutes = require('./health');
