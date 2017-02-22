@@ -1,10 +1,9 @@
 'use strict';
 
 var express = require('express');
-var path = require('path');
+var bodyParser = require('body-parser');
 var winston = require('winston');
 var nconf = require('nconf');
-var bodyParser = require('body-parser');
 
 var routes = require('./routes');
 var connector = require('./connector');
@@ -46,8 +45,7 @@ nconf.env()
 winston.level = nconf.get('logLevel');
 
 var app = express();
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.raw({type: '*/*'}));
 app.use('/', routes);
 
 var rabbitParams = nconf.get('rabbitmq');
