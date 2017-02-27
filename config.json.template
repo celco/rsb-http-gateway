@@ -1,5 +1,5 @@
 {
-    "logLevel": <%= node['rsb']['logLevel'] %>,
+    "logLevel": "<%= node['rsb']['logLevel'] %>",
     "listenPort": <%= node['rsb']['listenPort'] %>,
     "rpcTimeout": <%= node['rsb']['rpcTimeout'] %>,
     "rabbitmq": {
