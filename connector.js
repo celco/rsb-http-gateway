@@ -23,7 +23,7 @@ function connect(params) {
     return amqp.connect(connString).then(function (conn) {
         process.once('SIGINT', function () {
             conn.close().then(function () {
-                die("Interrupted");
+                die('Interrupted');
             });
         });
 
@@ -39,12 +39,11 @@ function connect(params) {
         winston.info('Using RabbitMQ queue: %s', q.queue);
 
         connectorQueue = q.queue;
-        return prepareChannel(channel, q.queue, "New connection");
+        return prepareChannel(channel, q.queue, 'New connection');
     }, die);
 }
 
 function call(rpc) {
-    // TODO: fix not existing Exchange error handling
     var timestamp = new Date().getTime();
     return new Promise(function (resolve, reject) {
         function resolveError(status, message) {
@@ -55,42 +54,58 @@ function call(rpc) {
             });
         }
 
-        return connectorChannel.checkExchange(rpc.requestExchange).then(function () {
-            return connectorChannel.checkExchange(rpc.responseExchange)
-        }, function () {
-            resolveError(404, 'Exchange "' + rpc.requestExchange + '" does not exist');
-        }).then(function () {
-            return connectorChannel.bindQueue(connectorQueue, rpc.responseExchange, connectorQueue);
-        }, function () {
-            resolveError(404, 'Exchange "' + rpc.responseExchange + '" does not exist');
-        }).then(function () {
-            var correlationId = uuid.v4();
-            setTimeout(function () {
-                var request = connectorRequests[correlationId];
-                if (request) {
-                    request.resolve({
-                        status: 504,
-                        payload: 'Request timed out',
-                        contentType: 'text/plain'
+        connectorChannel.checkExchange(rpc.requestExchange)
+            .then(function () {
+                return connectorChannel.checkExchange(rpc.responseExchange)
+                    .then(function () {
+                        return connectorChannel.bindQueue(connectorQueue, rpc.responseExchange, connectorQueue)
+                            .then(function () {
+                                publishRequest(rpc, timestamp);
+                            })
+                            .catch(function () {
+                                resolveError(500, 'Failed to bind to "' + rpc.responseExchange + '"');
+                            })
+                    })
+                    .catch(function () {
+                        resolveError(404, 'Exchange "' + rpc.responseExchange + '" does not exist');
                     });
-                }
-            }, rpc.timeout);
-            connectorRequests[correlationId] = {
-                resolve: resolve
-            }
-
-            return connectorChannel.publish(rpc.requestExchange, rpc.routingKey, rpc.body, {
-                mandatory: true,
-                replyTo: connectorQueue,
-                correlationId: correlationId,
-                contentType: rpc.contentType,
-                timestamp: timestamp,
-                type: rpc.requestExchange,
-                userId: connectorLogin
+            })
+            .catch(function (err) {
+                resolveError(404, 'Exchange "' + rpc.requestExchange + '" does not exist');
             });
-        });
     });
 }
+
+function publishRequest(rpc, timestamp) {
+    var correlationId = uuid.v4();
+    connectorRequests[correlationId] = {
+        resolve: resolve
+    }
+
+    setTimeout(function () {
+        var request = connectorRequests[correlationId];
+        if (request) {
+            request.resolve({
+                status: 504,
+                payload: 'Request timed out',
+                contentType: 'text/plain'
+            });
+        }
+    }, rpc.timeout);
+
+    return connectorChannel.publish(rpc.requestExchange, rpc.routingKey, rpc.body, {
+        mandatory: true,
+        replyTo: connectorQueue,
+        correlationId: correlationId,
+        contentType: rpc.contentType,
+        timestamp: timestamp,
+        type: rpc.requestExchange,
+        userId: connectorLogin
+    });
+}
+
+
+// TODO: handle channel.on('return', function (msg) {})
 
 function prepareChannel(ch, queue, reason) {
     ch.on('error', function (error) {
@@ -103,7 +118,7 @@ function prepareChannel(ch, queue, reason) {
         }
     });
 
-    winston.info('Created channel, reason: %s', reason);
+    winston.debug('Created channel, reason: %s', reason);
     connectorChannel = ch;
 
     return ch.consume(queue, handleResponse, {noAck: true});
@@ -117,6 +132,8 @@ function handleResponse(msg) {
             payload: msg.content,
             contentType: msg.contentType
         });
+
+        delete connectorRequests[msg.properties.correlationId];
     }
 }
 
@@ -129,8 +146,9 @@ function die() {
 
     connectorConnection.close().then(function () {
         process.exit(123);
-    }).catch(function () {
-        process.exit(123);
+    }).catch(function (err) {
+        winston.error('Connection close error: %s', err);
+        process.exit(126);
     });
 }
 

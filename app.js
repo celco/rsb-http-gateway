@@ -30,7 +30,7 @@ nconf.env()
     .file({ file: process.env['CONFIG_FILE'] || 'config.json'})
     .defaults({
         listenPort: process.env['LISTEN_PORT'] || 8080,
-        logLevel: 'info',
+        logLevel: 'debug',
         rpcTimeout: 20 * 1000, // milliseconds
         rabbitmq: {
             hostname: "localhost",
