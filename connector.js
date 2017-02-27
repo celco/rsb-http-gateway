@@ -46,12 +46,21 @@ function connect(params) {
 function call(rpc) {
     var timestamp = new Date().getTime();
     return new Promise(function (resolve, reject) {
-        function resolveError(status, message) {
-            resolve({
-                status: status,
-                payload: message,
-                contentType: 'text/plain'
-            });
+        var request = {
+            resolveOk: function (payload, contentType) {
+                return resolve({
+                    status: 200,
+                    payload: payload,
+                    contentType: contentType
+                });
+            },
+            resolveError: function (status, message) {
+                return resolve({
+                    status: status,
+                    payload: message,
+                    contentType: 'text/plain'
+                });
+            }
         }
 
         connectorChannel.checkExchange(rpc.requestExchange)
@@ -60,38 +69,28 @@ function call(rpc) {
                     .then(function () {
                         return connectorChannel.bindQueue(connectorQueue, rpc.responseExchange, connectorQueue)
                             .then(function () {
-                                return publishRequest(rpc, timestamp, resolve);
+                                return publishRequest(rpc, timestamp, request);
                             })
                             .catch(function (err) {
                                 winston.error('Bind error: %s', err);
-                                resolveError(500, 'Failed to bind to "' + rpc.responseExchange + '"');
+                                request.resolveError(500, 'Failed to bind to "' + rpc.responseExchange + '"');
                             })
                     })
                     .catch(function () {
-                        resolveError(404, 'Exchange "' + rpc.responseExchange + '" does not exist');
+                        request.resolveError(404, 'Exchange "' + rpc.responseExchange + '" does not exist');
                     });
             })
             .catch(function (err) {
-                resolveError(404, 'Exchange "' + rpc.requestExchange + '" does not exist');
+                request.resolveError(404, 'Exchange "' + rpc.requestExchange + '" does not exist');
             });
     });
 }
 
-function publishRequest(rpc, timestamp, resolve) {
+function publishRequest(rpc, timestamp, request) {
     var correlationId = uuid.v4();
-    connectorRequests[correlationId] = {
-        resolve: resolve
-    }
-
+    connectorRequests[correlationId] = request
     setTimeout(function () {
-        var request = connectorRequests[correlationId];
-        if (request) {
-            request.resolve({
-                status: 504,
-                payload: 'Request timed out',
-                contentType: 'text/plain'
-            });
-        }
+        request.resolveError(504, 'Request timed out');
     }, rpc.timeout);
 
     return connectorChannel.publish(rpc.requestExchange, rpc.routingKey, rpc.body, {
@@ -105,9 +104,6 @@ function publishRequest(rpc, timestamp, resolve) {
     });
 }
 
-
-// TODO: handle channel.on('return', function (msg) {})
-
 function prepareChannel(ch, queue, reason) {
     ch.on('error', function (error) {
         if (error.code == 404) {
@@ -119,6 +115,8 @@ function prepareChannel(ch, queue, reason) {
         }
     });
 
+    ch.on('return', handleReturn);
+
     winston.debug('Created channel, reason: %s', reason);
     connectorChannel = ch;
 
@@ -128,11 +126,15 @@ function prepareChannel(ch, queue, reason) {
 function handleResponse(msg) {
     var request = connectorRequests[msg.properties.correlationId];
     if (request) {
-        request.resolve({
-            status: 200,
-            payload: msg.content,
-            contentType: msg.contentType
-        });
+        request.resolveOk(msg.content, msg.contentType);
+        delete connectorRequests[msg.properties.correlationId];
+    }
+}
+
+function handleReturn(msg) {
+    var request = connectorRequests[msg.properties.correlationId];
+    if (request) {
+        request.resolveError(404, 'Request not routed');
 
         delete connectorRequests[msg.properties.correlationId];
     }
