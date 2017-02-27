@@ -1,0 +1,13 @@
+{
+    "logLevel": <%= node['rsb']['logLevel'] %>,
+    "listenPort": <%= node['rsb']['listenPort'] %>,
+    "rpcTimeout": <%= node['rsb']['rpcTimeout'] %>,
+    "rabbitmq": {
+        "hostname": "<%= node['rsb']['rabbitmq']['hostname'] %>",
+        "port": "<%= node['rsb']['rabbitmq']['port'] %>",
+        "login": "<%= node['rsb']['rabbitmq']['login'] %>",
+        "password": "<%= node['rsb']['rabbitmq']['password'] %>",
+        "vhost": "<%= node['rsb']['rabbitmq']['vhost'] %>",
+        "heartbeat": <%= node['rsb']['rabbitmq']['heartbeat'] %>
+    }
+}
