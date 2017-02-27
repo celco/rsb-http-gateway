@@ -60,9 +60,10 @@ function call(rpc) {
                     .then(function () {
                         return connectorChannel.bindQueue(connectorQueue, rpc.responseExchange, connectorQueue)
                             .then(function () {
-                                publishRequest(rpc, timestamp);
+                                return publishRequest(rpc, timestamp, resolve);
                             })
-                            .catch(function () {
+                            .catch(function (err) {
+                                winston.error('Bind error: %s', err);
                                 resolveError(500, 'Failed to bind to "' + rpc.responseExchange + '"');
                             })
                     })
@@ -76,7 +77,7 @@ function call(rpc) {
     });
 }
 
-function publishRequest(rpc, timestamp) {
+function publishRequest(rpc, timestamp, resolve) {
     var correlationId = uuid.v4();
     connectorRequests[correlationId] = {
         resolve: resolve
