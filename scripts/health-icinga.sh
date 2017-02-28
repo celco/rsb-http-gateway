@@ -1,5 +1,9 @@
 #!/bin/bash
 
+default_timeout=20
+default_subsystem=""
+default_verbose=false
+
 function print_usage
 {
 cat << EOF >&2
@@ -9,14 +13,14 @@ This script checks health of a given component and returns result in format comp
 
 OPTIONS:
    -h      Help (this message)
-   -s      Subsystem
-   -t      Timeout in seconds
-   -v      Verbose mode
+   -s      Subsystem (default "$default_subsystem")
+   -t      Timeout in seconds (default $default_timeout)
+   -v      Verbose mode (default $default_verbose)
 
    Sample usage:
-       ./health-icinga.sh http://localhost database
-       ./health-icinga.sh http://localhost database -t 5
-       ./health-icinga.sh http://localhost database -s dbConnection
+       ./health-icinga.sh localhost database
+       ./health-icinga.sh localhost database -t 5
+       ./health-icinga.sh localhost database -s dbConnection
 
 EOF
 }
@@ -44,7 +48,7 @@ EOF
 function print_response
 {
 cat << EOF >&2
-cURL Status: $curl_status
+curl Status: $curl_status
 HTTP Status: $http_status
 HTTP Body: $body
 EOF
@@ -61,9 +65,9 @@ component="$2"
 shift 2
 
 #--- Optional parameters
-timeout=20
-subsystem=""
-verbose=false
+timeout=$default_timeout
+subsystem=$default_subsystem
+verbose=$default_verbose
 
 while getopts ":hvs:t:" opt
 do
