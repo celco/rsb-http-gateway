@@ -147,12 +147,14 @@ function die() {
         winston.error(arguments[0]);
     }
 
-    connectorConnection.close().then(function () {
-        process.exit(123);
-    }).catch(function (err) {
-        winston.error('Connection close error: %s', err);
-        process.exit(126);
-    });
+    if (connectorConnection) {
+        connectorConnection.close().then(function () {
+            process.exit(123);
+        }).catch(function (err) {
+            winston.error('Connection close error: %s', err);
+            process.exit(126);
+        });
+    }
 }
 
 module.exports = {
