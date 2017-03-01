@@ -1,5 +1,7 @@
 #!/bin/bash
 
+default_hostname="localhost"
+default_port=80
 default_timeout=20
 default_subsystem=""
 default_verbose=false
@@ -7,12 +9,15 @@ default_verbose=false
 function print_usage
 {
 cat << EOF >&2
-Usage: $0 <address> <component> [<options>]
+Usage: $0 <hostname> [<options>]
 
 This script checks health of a given component and returns result in format compatible with Icinga2.
 
 OPTIONS:
    -h      Help (this message)
+   -c      Component
+   -H      Hostname (default localhost)
+   -p      Port (default 80)
    -s      Subsystem (default "$default_subsystem")
    -t      Timeout in seconds (default $default_timeout)
    -v      Verbose mode (default $default_verbose)
@@ -23,6 +28,15 @@ OPTIONS:
        ./health-icinga.sh localhost database -s dbConnection
 
 EOF
+}
+
+function print_missing_option
+{
+cat << EOF >&2
+Missing option -$1
+
+EOF
+    print_usage
 }
 
 function print_invalid_option
@@ -37,42 +51,38 @@ EOF
 function print_request
 {
 cat << EOF >&2
-Address: $address
-Component: $component
-Timeout: $timeout
-Subsystem: $subsystem
-URL: $url
+Hostname:     $hostname
+Port:         $port
+Component:    $component
+Timeout:      $timeout
+Subsystem:    $subsystem
+URL:          $url
 EOF
 }
 
 function print_response
 {
 cat << EOF >&2
-curl Status: $curl_status
-HTTP Status: $http_status
-HTTP Body: $body
+curl Status:  $curl_status
+HTTP Status:  $http_status
+HTTP Body:    $body
 EOF
 }
 
-#--- Required positional parameters
-if [ $# -lt 2 ]; then
-    print_usage
-    exit 1
-fi
-
-address="$1"
-component="$2"
-shift 2
-
 #--- Optional parameters
+hostname=$default_hostname
+port=$default_port
 timeout=$default_timeout
 subsystem=$default_subsystem
 verbose=$default_verbose
 
-while getopts ":hvs:t:" opt
+while getopts ":hvc:H:p:s:t:" opt
 do
      case $opt in
          h) print_usage; exit 1 ;;
+         c) component=$OPTARG ;;
+         H) hostname=$OPTARG ;;
+         p) port=$OPTARG ;;
          t) timeout=$OPTARG ;;
          s) subsystem=$OPTARG ;;
          v) verbose=true ;;
@@ -80,7 +90,12 @@ do
      esac
 done
 
-url="$address/rpc/GetHealth/$component?timeout=$(($timeout * 1000))"
+if [ -z component ]; then
+    print_missing_option 'c'
+    exit 1
+fi
+
+url="$hostname:$port/rpc/GetHealth/$component?timeout=$(($timeout * 1000))"
 
 if $verbose; then print_request; fi
 
