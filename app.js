@@ -49,11 +49,16 @@ app.use(bodyParser.raw({type: '*/*'}));
 app.use('/', routes);
 
 var rabbitParams = nconf.get('rabbitmq');
-connector.connect(rabbitParams).then(function () {
-    var server = app.listen(nconf.get('listenPort'), 'localhost', function () {
-        var host = server.address().address;
-        var port = server.address().port;
 
-        winston.info('Accepting connections on http://%s:%s', host, port);
+connector.connect(rabbitParams)
+    .then(function () {
+        var server = app.listen(nconf.get('listenPort'), 'localhost', function () {
+            var host = server.address().address;
+            var port = server.address().port;
+
+            winston.info('Accepting connections on http://%s:%s', host, port);
+        });
+    })
+    .catch(function (err) {
+        connector.die(err);
     });
-});

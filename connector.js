@@ -20,27 +20,30 @@ function connect(params) {
     connectorLogin = params.login;
 
     var channel;
-    return amqp.connect(connString).then(function (conn) {
-        process.once('SIGINT', function () {
-            conn.close().then(function () {
-                die('Interrupted');
+    return amqp.connect(connString)
+        .then(function (conn) {
+            process.once('SIGINT', function () {
+                conn.close().then(function () {
+                    die('Interrupted');
+                });
             });
-        });
 
-        connectorConnection = conn;
-        return conn.createChannel();
-    }, die).then(function (ch) {
-        winston.info('Connected to RabbitMQ on %s:%d as %s',
-                params.hostname, params.port, params.login);
+            connectorConnection = conn;
+            return conn.createChannel()
+                .then(function (ch) {
+                    winston.info('Connected to RabbitMQ on %s:%d as %s',
+                            params.hostname, params.port, params.login);
 
-        channel = ch;
-        return ch.assertQueue(null, {exclusive: true, durable: false});
-    }, die).then(function (q) {
-        winston.info('Using RabbitMQ queue: %s', q.queue);
+                    channel = ch;
+                    return ch.assertQueue(null, {exclusive: true, durable: false})
+                        .then(function (q) {
+                            winston.info('Using RabbitMQ queue: %s', q.queue);
 
-        connectorQueue = q.queue;
-        return prepareChannel(channel, q.queue, 'New connection');
-    }, die);
+                            connectorQueue = q.queue;
+                            return prepareChannel(channel, q.queue, 'New connection');
+                        });
+                })
+        })
 }
 
 function call(rpc) {
@@ -159,5 +162,6 @@ function die() {
 
 module.exports = {
     connect: connect,
-    call: call
+    call: call,
+    die: die
 };
