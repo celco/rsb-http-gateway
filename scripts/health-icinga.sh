@@ -118,30 +118,30 @@ ok="$name OK - $component"
 
 case $curl_status in
     0)   ;;
-    7)   echo "$critical | Gateway offline"; exit ;;
-    28)  echo "$critical | Gateway timeout"; exit ;;
-    *)   echo "$critical | Gateway communication error: $curl_status"; exit ;;
+    7)   echo "$critical - Gateway offline"; exit ;;
+    28)  echo "$critical - Gateway timeout"; exit ;;
+    *)   echo "$critical - Gateway communication error: $curl_status"; exit ;;
 esac
 
 case $http_status in
     200) ;;
-    504) echo "$critical | Component timeout ($body)"; exit ;;
-    500) echo "$critical | Gateway error ($body)" ;;
-    404) echo "$critical | Component offline ($body)"; exit ;;
-    *)   echo "$critical | Unexpected response $http_status ($body)"; exit ;;
+    504) echo "$critical - Component timeout ($body)"; exit ;;
+    500) echo "$critical - Gateway error ($body)" ;;
+    404) echo "$critical - Component offline ($body)"; exit ;;
+    *)   echo "$critical - Unexpected response $http_status ($body)"; exit ;;
 esac
 
 if [ -z "$subsystem" ]; then
     healthy=$(echo "$body" | jq '.healthy')
     case $healthy in
         "true") echo "$ok"; exit ;;
-        *)      echo "$warning | Unhealthy"; exit ;;
+        *)      echo "$warning - Unhealthy"; exit ;;
     esac
 else
     state=$(echo "$body" | jq ".subsystems.$subsystem")
     case $state in
         "Healthy") echo "$ok - $subsystem"; exit ;;
-        null)      echo "$critical - $subsystem | subsystem not found"; exit ;;
-        *)         echo "$warning - $subsystem | $state"; exit ;;
+        null)      echo "$critical - $subsystem - subsystem not found"; exit ;;
+        *)         echo "$warning - $subsystem - $state"; exit ;;
     esac
 fi
