@@ -1,5 +1,7 @@
 #!/bin/bash
 
+plugin_name="RSB_HTTP_GATEWAY"
+
 default_hostname="localhost"
 default_port=80
 default_timeout=20
@@ -69,6 +71,30 @@ HTTP Body:    $body
 EOF
 }
 
+function exit_ok
+{
+    echo "$plugin_name OK - $component$1"
+    exit 0
+}
+
+function exit_warning
+{
+    echo "$plugin_name WARNING - $component$1"
+    exit 1
+}
+
+function exit_critical
+{
+    echo "$plugin_name CRITICAL - $component$1"
+    exit 2
+}
+
+function exit_unknown
+{
+    echo "$plugin_name UNKNOWN - $component$1"
+    exit 3
+}
+
 #--- Optional parameters
 hostname=$default_hostname
 port=$default_port
@@ -79,20 +105,20 @@ verbose=$default_verbose
 while getopts ":hvc:H:p:s:t:" opt
 do
      case $opt in
-         h) print_usage; exit 1 ;;
+         h) print_usage; exit 7 ;;
          c) component=$OPTARG ;;
          H) hostname=$OPTARG ;;
          p) port=$OPTARG ;;
          t) timeout=$OPTARG ;;
          s) subsystem=$OPTARG ;;
          v) verbose=true ;;
-         *) print_invalid_option; exit 1 ;;
+         *) print_invalid_option; exit 7 ;;
      esac
 done
 
 if [ -z component ]; then
     print_missing_option 'c'
-    exit 1
+    exit 7
 fi
 
 url="$hostname:$port/rpc/GetHealth/$component?timeout=$(($timeout * 1000))"
@@ -111,37 +137,32 @@ body=$(sed -r 's/HTTP_STATUS:[0-9]+//g' <<< "$res")
 
 if $verbose; then print_response; fi
 
-name="RSB_HTTP_GATEWAY"
-critical="$name CRITICAL - $component"
-warning="$name WARNING - $component"
-ok="$name OK - $component"
-
 case $curl_status in
     0)   ;;
-    7)   echo "$critical - Gateway offline"; exit ;;
-    28)  echo "$critical - Gateway timeout"; exit ;;
-    *)   echo "$critical - Gateway communication error: $curl_status"; exit ;;
+    7)   exit_unknown " - Gateway offline" ;;
+    28)  exit_unknown " - Gateway timeout" ;;
+    *)   exit_unknown " - Gateway communication error: $curl_status" ;;
 esac
 
 case $http_status in
     200) ;;
-    504) echo "$critical - Component timeout ($body)"; exit ;;
-    500) echo "$critical - Gateway error ($body)" ;;
-    404) echo "$critical - Component offline ($body)"; exit ;;
-    *)   echo "$critical - Unexpected response $http_status ($body)"; exit ;;
+    504) exit_critical " - Component timeout ($body)" ;;
+    500) exit_critical " - Gateway error ($body)" ;;
+    404) exit_critical " - Component offline ($body)" ;;
+    *)   exit_critical " - Unexpected response $http_status ($body)" ;;
 esac
 
 if [ -z "$subsystem" ]; then
     healthy=$(echo "$body" | jq '.healthy')
     case $healthy in
-        "true") echo "$ok"; exit ;;
-        *)      echo "$warning - Unhealthy"; exit ;;
+        "true") exit_ok ;;
+        *)      exit_warning " - Unhealthy" ;;
     esac
 else
     state=$(echo "$body" | jq ".subsystems.$subsystem")
     case $state in
-        "Healthy") echo "$ok - $subsystem"; exit ;;
-        null)      echo "$critical - $subsystem - subsystem not found"; exit ;;
-        *)         echo "$warning - $subsystem - $state"; exit ;;
+        "Healthy") exit_ok " - $subsystem" ;;
+        null)      exit_critical " - $subsystem - subsystem not found" ;;
+        *)         exit_warning " - $subsystem - $state" ;;
     esac
 fi
