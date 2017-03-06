@@ -53,21 +53,22 @@ EOF
 function print_request
 {
 cat << EOF >&2
-Hostname:     $hostname
-Port:         $port
-Component:    $component
-Timeout:      $timeout
-Subsystem:    $subsystem
-URL:          $url
+Hostname:      $hostname
+Port:          $port
+Component:     $component
+Timeout:       $timeout
+Subsystem:     $subsystem
+URL:           $url
+Request body:  $request_body
 EOF
 }
 
 function print_response
 {
 cat << EOF >&2
-curl Status:  $curl_status
-HTTP Status:  $http_status
-HTTP Body:    $body
+curl Status:   $curl_status
+HTTP Status:   $http_status
+Response body: $response_body
 EOF
 }
 
@@ -122,6 +123,7 @@ if [ -z component ]; then
 fi
 
 url="$hostname:$port/rpc/GetHealth/$component?timeout=$(($timeout * 1000))"
+request_body="{\"subsystemCheckTimeout\": $(($timeout * 9 / 10))}"
 
 if $verbose; then print_request; fi
 
@@ -130,10 +132,11 @@ res=$(curl --silent \
            --connect-timeout $timeout \
            --max-time $(($timeout + 1)) \
            --header "Content-Type: application/json" \
-           --data "{}" "$url")
+           --data "$request_body" \
+           "$url")
 curl_status=$?
 http_status=$(echo $res | sed -e 's/.*HTTP_STATUS://')
-body=$(sed -r 's/HTTP_STATUS:[0-9]+//g' <<< "$res")
+response_body=$(sed -r 's/HTTP_STATUS:[0-9]+//g' <<< "$res")
 
 if $verbose; then print_response; fi
 
@@ -146,20 +149,20 @@ esac
 
 case $http_status in
     200) ;;
-    504) exit_critical " - Component timeout ($body)" ;;
-    500) exit_critical " - Gateway error ($body)" ;;
-    404) exit_critical " - Component offline ($body)" ;;
-    *)   exit_critical " - Unexpected response $http_status ($body)" ;;
+    504) exit_critical " - Component timeout ($response_body)" ;;
+    500) exit_critical " - Gateway error ($response_body)" ;;
+    404) exit_critical " - Component offline ($response_body)" ;;
+    *)   exit_critical " - Unexpected response $http_status ($response_body)" ;;
 esac
 
 if [ -z "$subsystem" ]; then
-    healthy=$(echo "$body" | jq '.healthy')
+    healthy=$(echo "$response_body" | jq '.healthy')
     case $healthy in
         "true") exit_ok ;;
         *)      exit_warning " - Unhealthy" ;;
     esac
 else
-    state=$(echo "$body" | jq ".subsystems.$subsystem")
+    state=$(echo "$response_body" | jq ".subsystems.$subsystem")
     case $state in
         "Healthy") exit_ok " - $subsystem" ;;
         null)      exit_critical " - $subsystem - subsystem not found" ;;
